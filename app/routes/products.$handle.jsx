@@ -1,6 +1,6 @@
 import {Suspense} from 'react';
 import {defer, redirect} from '@shopify/remix-oxygen';
-import {Await, Link, useLoaderData} from '@remix-run/react';
+import {Await, Link, useLoaderData, useLocation} from '@remix-run/react';
 
 import {
   Image,
@@ -26,8 +26,13 @@ export async function loader({params, request, context}) {
       !option.name.startsWith('_pos') &&
       !option.name.startsWith('_psq') &&
       !option.name.startsWith('_ss') &&
-      !option.name.startsWith('_v'),
+      !option.name.startsWith('_v') &&
+      !option.name.startsWith('selling_plan'),
   );
+
+  const searchParams = new URL(request.url).searchParams;
+  const sellingPlanId = searchParams.get('selling_plan');
+  console.log('SPID', sellingPlanId);
 
   if (!handle) {
     throw new Error('Expected product handle to be defined');
@@ -121,7 +126,8 @@ function ProductImage({image}) {
 }
 
 function ProductMain({selectedVariant, product, variants}) {
-  const {title, descriptionHtml} = product;
+  const {title, descriptionHtml, sellingPlanGroups} = product;
+  console.log(sellingPlanGroups);
   return (
     <div className="product-main">
       <h1>{title}</h1>
@@ -145,6 +151,7 @@ function ProductMain({selectedVariant, product, variants}) {
               product={product}
               selectedVariant={selectedVariant}
               variants={data.product?.variants.nodes || []}
+              sellingPlanGroups={sellingPlanGroups}
             />
           )}
         </Await>
@@ -182,7 +189,11 @@ function ProductPrice({selectedVariant}) {
   );
 }
 
-function ProductForm({product, selectedVariant, variants}) {
+function ProductForm({product, selectedVariant, variants, sellingPlanGroups}) {
+  const {pathname, search} = useLocation();
+  const linkParams = new URLSearchParams(search);
+  const selectedSellingPlan = linkParams.get('selling_plan');
+
   return (
     <div className="product-form">
       <VariantSelector
@@ -192,6 +203,39 @@ function ProductForm({product, selectedVariant, variants}) {
       >
         {({option}) => <ProductOptions key={option.name} option={option} />}
       </VariantSelector>
+
+      {sellingPlanGroups?.nodes && (
+        <div>
+          {sellingPlanGroups.nodes.map((sellingPlanGroup) => {
+            const {name, sellingPlans} = sellingPlanGroup;
+            return sellingPlans.nodes.map((sellingPlan) => {
+              linkParams.set('selling_plan', sellingPlan.id);
+              return (
+                <Link
+                  key={sellingPlan.id}
+                  to={`${pathname}?${linkParams.toString()}`}
+                  className={`border inline-block p-4 mr-2 leading-none py-1 border-b-[1.5px] hover:no-underline cursor-pointer transition-all duration-200
+                  ${
+                    selectedSellingPlan === sellingPlan.id
+                      ? 'border-gray-500'
+                      : 'border-neutral-50'
+                  }`}
+                  preventScrollReset
+                  replace
+                >
+                  <p>
+                    <strong>{name}</strong>
+                    <br />
+                    {sellingPlan.options.map(
+                      (option) => `${option.name} ${option.value}`,
+                    )}
+                  </p>
+                </Link>
+              );
+            });
+          })}
+        </div>
+      )}
       <br />
       <AddToCartButton
         disabled={!selectedVariant || !selectedVariant.availableForSale}
@@ -203,6 +247,7 @@ function ProductForm({product, selectedVariant, variants}) {
             ? [
                 {
                   merchandiseId: selectedVariant.id,
+                  sellingPlanId: 1234,
                   quantity: 1,
                 },
               ]
@@ -328,6 +373,24 @@ const PRODUCT_FRAGMENT = `#graphql
       description
       title
     }
+    sellingPlanGroups(first:10) {
+			nodes {
+				name
+				options {
+					name
+					values
+				}
+				sellingPlans(first:10) {
+					nodes {
+						id
+						options {
+							name
+							value
+						}
+					}
+				}
+			}
+		}
   }
   ${PRODUCT_VARIANT_FRAGMENT}
 `;
