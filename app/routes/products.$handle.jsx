@@ -247,7 +247,7 @@ function ProductForm({product, selectedVariant, variants, sellingPlanGroups}) {
             ? [
                 {
                   merchandiseId: selectedVariant.id,
-                  sellingPlanId: 1234,
+                  sellingPlanId: selectedSellingPlan,
                   quantity: 1,
                 },
               ]

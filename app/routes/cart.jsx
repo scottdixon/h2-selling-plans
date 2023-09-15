@@ -10,7 +10,6 @@ export const meta = () => {
 
 export async function action({request, context}) {
   const {session, cart} = context;
-
   const [formData, customerAccessToken] = await Promise.all([
     request.formData(),
     session.get('customerAccessToken'),
@@ -83,7 +82,6 @@ export async function action({request, context}) {
 export default function Cart() {
   const [root] = useMatches();
   const cart = root.data?.cart;
-
   return (
     <div className="cart">
       <h1>Cart</h1>
